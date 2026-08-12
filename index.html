@@ -314,14 +314,9 @@
     <div class="field">
       <label for="mounting">Mounting</label>
       <select id="mounting">
-        <option value="clamped" selected>Clamped (S<sub>max</sub> at edge)</option>
-        <option value="unclamped">Unclamped (S<sub>max</sub> at centre)</option>
+        <option value="clamped" selected>Clamped (K = 0.75)</option>
+        <option value="unclamped">Unclamped (K = 1.125)</option>
       </select>
-    </div>
-
-    <div class="field">
-      <label for="kconst">Support constant <i>K</i></label>
-      <input type="number" id="kconst" value="0.75" step="0.005" min="0" />
     </div>
 
     <div class="field">
@@ -433,7 +428,8 @@
       Solving for <i>T</i> gives the expressions above. The support constant <i>K</i> depends on how the
       window is held, on the force introduced in clamping, and on how brittle or ductile the material is.
       Empirically <i>K</i> = 0.75 suits most optical crystals with a clamped perimeter, and a value 50%
-      greater, <i>K</i> = 1.125, when unclamped. Both are editable here if you have a better figure.
+      greater, <i>K</i> = 1.125, when unclamped; the mounting dropdown selects between the two. Clamped
+      puts the maximum stress at the edge of the window, unclamped at its centre.
     </p>
     <p>
       A safety factor of 4 is described as modest but sufficient for many laboratory applications where
@@ -489,7 +485,6 @@
       "fa": 55,
       "fa-unit": "1e6",
       "mounting": "clamped",
-      "kconst": 0.75,
       "sf": 5,
       "shape": "round",
       "dia": 50,
@@ -505,8 +500,10 @@
     };
 
     // Support constant K: empirical, 0.75 clamped and 50% greater unclamped.
+    // Set by the mounting choice; the dropdown labels carry the values.
     const K_CLAMPED = 0.75;
     const K_UNCLAMPED = 1.125;
+    const kFor = mounting => mounting === "clamped" ? K_CLAMPED : K_UNCLAMPED;
 
     const $ = id => document.getElementById(id);
 
@@ -557,28 +554,28 @@
     // ── Read the form ─────────────────────────────────────────────────────────
     function readInputs() {
       const shape = $("shape").value;
+      const mounting = $("mounting").value;
       const v = id => parseFloat($(id).value);
       const u = id => parseFloat($(id).value);
 
       const Fa = v("fa") * u("fa-unit");                 // Pa
       const P  = v("pressure") * u("pressure-unit");     // Pa
       const SF = v("sf");
-      const K  = v("kconst");
+      const K  = kFor(mounting);
 
       const dims = shape === "round"
         ? { D: v("dia") * u("dia-unit") }                                    // mm
         : { L: v("len") * u("len-unit"), W: v("wid") * u("wid-unit") };      // mm
 
-      return { shape, Fa, P, SF, K, dims };
+      return { shape, mounting, Fa, P, SF, K, dims };
     }
 
     function validate(inp) {
-      const { shape, Fa, P, SF, K, dims } = inp;
-      if ([Fa, P, SF, K].some(isNaN)) return "All fields must be valid numbers.";
+      const { shape, Fa, P, SF, dims } = inp;
+      if ([Fa, P, SF].some(isNaN)) return "All fields must be valid numbers.";
       if (Fa <= 0) return "Apparent elastic limit must be greater than zero.";
       if (P  <= 0) return "Pressure difference must be greater than zero.";
       if (SF <= 0) return "Safety factor must be greater than zero.";
-      if (K  <= 0) return "Support constant K must be greater than zero.";
       if (shape === "round") {
         if (isNaN(dims.D)) return "All fields must be valid numbers.";
         if (dims.D <= 0) return "Diameter must be greater than zero.";
@@ -605,8 +602,7 @@
       errorEl.textContent = "";
       resultEl.hidden = false;
 
-      const { shape, Fa, P, SF, K, dims } = inp;
-      const mounting = $("mounting").value;
+      const { shape, mounting, Fa, P, SF, K, dims } = inp;
       const isClamped = mounting === "clamped";
 
       const T = requiredThickness(shape, dims, P, Fa, SF, K);
@@ -659,7 +655,7 @@
         return;
       }
 
-      const { shape, Fa, P, SF, K, dims } = inp;
+      const { shape, mounting, Fa, P, SF, K, dims } = inp;
       const Smax = maxStress(shape, dims, P, T, K);
       const realized = Fa / Smax;
 
@@ -682,7 +678,7 @@
       out.hidden = false;
       out.innerHTML =
         "At <strong>" + fmt(T) + " mm</strong> ("
-        + ($("mounting").value === "clamped" ? "clamped" : "unclamped")
+        + (mounting === "clamped" ? "clamped" : "unclamped")
         + ", <i>K</i> = " + fmt(K) + "):<br>"
         + "Stress in the window S<sub>max</sub> = " + stressText(Smax) + "<br>"
         + "Realised safety factor = <span class=\"" + cls + "\">" + fmt(realized, 4) + "</span> "
@@ -714,10 +710,6 @@
       faUnitPrev = next;
     }
 
-    function applyMounting() {
-      $("kconst").value = $("mounting").value === "clamped" ? K_CLAMPED : K_UNCLAMPED;
-    }
-
     function applyShape() {
       const round = $("shape").value === "round";
       $("round-fields").hidden = !round;
@@ -738,7 +730,6 @@
 
     $("material").addEventListener("change", () => { applyMaterial(); update(); });
     $("fa-unit").addEventListener("change", () => { convertFaUnit(); update(); });
-    $("mounting").addEventListener("change", () => { applyMounting(); update(); });
     $("shape").addEventListener("change", () => { applyShape(); update(); });
     $("btn-reset").addEventListener("click", resetFields);
 

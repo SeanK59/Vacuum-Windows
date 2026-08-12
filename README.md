@@ -26,9 +26,10 @@ Circular      T = D · √(SF·K/4) · √( P / Fa )
 Rectangular   T = L · √(SF·K/2) · √( P / (Fa·(1+R²)) ),   R = L/W
 ```
 
-`SF` and `K` are live inputs rather than baked-in constants. The support constant
-defaults to the empirical values `K = 0.75` clamped and `K = 1.125` unclamped, but is
-editable.
+The safety factor is a live input rather than a baked-in constant, so this is the
+general form and not the pre-simplified `SF = 4` shortcuts. The support constant
+follows the mounting choice — the empirical `K = 0.75` clamped, and 50% greater at
+`K = 1.125` unclamped.
 
 ## Source
 
