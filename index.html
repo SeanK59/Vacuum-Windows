@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Online calculator for the thickness of optical windows used in vacuum and pressure applications, following the Crystran design equations." />
+  <title>Vacuum Window Thickness Calculator</title>
+  <style>
+    /* ── Shared site theme (matches seankung.ca) ── */
+    :root {
+      --bg: #121212;        /* page background */
+      --panel: #1e1e1e;     /* inputs, cards, result area */
+      --border: #333;       /* input/card borders */
+      --divider: #444;      /* section separator lines */
+      --text: #ffffff;      /* primary text */
+      --text-2: #ccc;       /* secondary text */
+      --text-3: #aaa;       /* tertiary/hints */
+      --accent: #80cbc4;    /* teal: headings, buttons, links, focus */
+      --accent-hover-bg: #2a3a3a;
+      --warn: #f85149;      /* validation errors, failed safety factor */
+      --marginal: #d29922;  /* safety factor just under target */
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.2rem 1rem 2rem;
+    }
+
+    .home-link {
+      align-self: flex-start;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .home-link a { color: var(--accent); text-decoration: none; }
+    .home-link a:hover { text-decoration: underline; }
+
+    h1 {
+      color: var(--text);
+      margin-bottom: 0.4rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-2);
+      text-align: center;
+      margin-bottom: 2rem;
+      max-width: 640px;
+    }
+
+    .formula-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.8rem 1.2rem;
+      font-size: 0.9rem;
+      color: var(--accent);
+      font-family: monospace;
+      text-align: center;
+      margin-bottom: 2rem;
+      max-width: 680px;
+      width: 100%;
+      line-height: 1.9;
+    }
+    .formula-box .inactive { color: var(--text-3); }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      width: 100%;
+      max-width: 800px;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Shape-dependent field groups take part in the parent grid directly */
+    .field-group { display: contents; }
+    .field-group[hidden] { display: none; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    label {
+      font-size: 0.9rem;
+      color: var(--text-2);
+    }
+
+    label span.unit {
+      color: var(--text-3);
+      font-size: 0.85rem;
+    }
+
+    .input-row { display: flex; gap: 0.4rem; }
+    .input-row input { flex: 1 1 auto; min-width: 0; }
+    .input-row select { flex: 0 0 5.5rem; }
+
+    select,
+    input[type="number"] {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+      padding: 0.45rem 0.65rem;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus,
+    input[type="number"]:focus { border-color: var(--accent); }
+
+    input[type="number"]:read-only {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    /* Remove number spinners for cleaner look */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { opacity: 0.4; }
+
+    .btn-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    button {
+      background: var(--panel);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      padding: 0.5rem 1.8rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    button:hover { background: var(--accent-hover-bg); }
+    button:active { transform: scale(0.97); }
+
+    .error-msg {
+      color: var(--warn);
+      font-size: 0.9rem;
+      min-height: 1.2rem;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    /* ── Result panel ── */
+    .result {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      width: 100%;
+      max-width: 800px;
+      padding: 1.4rem 1.4rem 1.2rem;
+      text-align: center;
+    }
+    .result[hidden] { display: none; }
+
+    .result-label {
+      font-size: 0.85rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .result-value {
+      display: block;
+      font-size: 2.6rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 0.2rem 0 0.1rem;
+      line-height: 1.15;
+    }
+    .result-alt {
+      display: block;
+      font-size: 0.95rem;
+      color: var(--text-2);
+    }
+    .result-secondary {
+      margin-top: 0.9rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--divider);
+      font-size: 0.95rem;
+      color: var(--text-2);
+    }
+    .working {
+      margin-top: 0.8rem;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: var(--text-3);
+      line-height: 1.7;
+      word-break: break-word;
+    }
+
+    /* ── Reverse check ── */
+    .reverse {
+      width: 100%;
+      max-width: 800px;
+      margin-top: 1.2rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1.1rem 1.4rem 1.2rem;
+    }
+    .reverse h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.8rem;
+    }
+    .reverse .field { max-width: 260px; }
+    .reverse-out {
+      margin-top: 0.9rem;
+      font-size: 0.95rem;
+      color: var(--text-2);
+      line-height: 1.7;
+    }
+    .reverse-out[hidden] { display: none; }
+    .sf-ok       { color: var(--accent);   font-weight: 600; }
+    .sf-marginal { color: var(--marginal); font-weight: 600; }
+    .sf-bad      { color: var(--warn);     font-weight: 600; }
+
+    .notes {
+      max-width: 800px;
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 0.9rem 1.2rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-size: 0.9rem;
+      color: var(--text-2);
+      line-height: 1.6;
+    }
+    .notes h2 {
+      font-size: 0.95rem;
+      color: var(--accent);
+      margin: 0.9rem 0 0.4rem;
+    }
+    .notes h2:first-child { margin-top: 0; }
+    .notes ul { margin: 0 0 0 1.1rem; }
+    .notes li { margin-bottom: 0.35rem; }
+    .notes p { margin-bottom: 0.6rem; }
+    .notes p:last-child { margin-bottom: 0; }
+    .notes a { color: var(--accent); text-decoration: none; }
+    .notes a:hover { text-decoration: underline; }
+    .notes .disclaimer { font-size: 0.85rem; color: var(--text-3); }
+  </style>
+</head>
+<body>
+
+  <nav class="home-link"><a href="https://seankung.ca/">&larr; seankung.ca</a></nav>
+
+  <h1>Vacuum Window Thickness Calculator</h1>
+  <p class="subtitle">
+    Minimum thickness of an optical window under a uniform pressure load, for vacuum
+    chambers, cryostats and pressure cells.
+  </p>
+
+  <div class="formula-box">
+    <div id="formula-round">
+      T = D &middot; &radic;(SF &middot; K / 4) &middot; &radic;(P / F<sub>a</sub>)
+    </div>
+    <div id="formula-rect">
+      T = L &middot; &radic;(SF &middot; K / 2) &middot; &radic;(P / (F<sub>a</sub> &middot; (1 + R&sup2;))) , &nbsp; R = L / W
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label for="material">Window material</label>
+      <select id="material">
+        <option value="276">Sapphire (Al&#8322;O&#8323;)</option>
+        <option value="26.9">Barium fluoride (BaF&#8322;)</option>
+        <option value="63.5">BK7 glass</option>
+        <option value="36.5">Calcium fluoride (CaF&#8322;)</option>
+        <option value="89.6">Germanium (Ge)</option>
+        <option value="26.2">KRS-5</option>
+        <option value="11.2">Lithium fluoride (LiF)</option>
+        <option value="49.6">Magnesium fluoride (MgF&#8322;)</option>
+        <option value="55.0" selected>Fused silica (SiO&#8322;)</option>
+        <option value="103.4">Zinc sulphide (ZnS, FLIR)</option>
+        <option value="55.1">Zinc selenide (ZnSe)</option>
+        <option value="custom">Custom&hellip;</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="fa">Apparent elastic limit <i>F</i><sub>a</sub></label>
+      <div class="input-row">
+        <input type="number" id="fa" value="55" step="0.1" min="0" readonly />
+        <select id="fa-unit">
+          <option value="1e6" selected>MPa</option>
+          <option value="6894.757293168361">psi</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="mounting">Mounting</label>
+      <select id="mounting">
+        <option value="clamped" selected>Clamped (S<sub>max</sub> at edge)</option>
+        <option value="unclamped">Unclamped (S<sub>max</sub> at centre)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="kconst">Support constant <i>K</i></label>
+      <input type="number" id="kconst" value="0.75" step="0.005" min="0" />
+    </div>
+
+    <div class="field">
+      <label for="sf">Safety factor <i>SF</i></label>
+      <input type="number" id="sf" value="5" step="0.5" min="0" />
+    </div>
+
+    <div class="field">
+      <label for="shape">Window shape</label>
+      <select id="shape">
+        <option value="round" selected>Round</option>
+        <option value="rect">Rectangular</option>
+      </select>
+    </div>
+
+    <div class="field-group" id="round-fields">
+      <div class="field">
+        <label for="dia">Unsupported diameter <i>D</i></label>
+        <div class="input-row">
+          <input type="number" id="dia" value="50" step="1" min="0" />
+          <select id="dia-unit">
+            <option value="1" selected>mm</option>
+            <option value="10">cm</option>
+            <option value="25.4">in</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="field-group" id="rect-fields" hidden>
+      <div class="field">
+        <label for="len">Unsupported length <i>L</i></label>
+        <div class="input-row">
+          <input type="number" id="len" value="52" step="1" min="0" />
+          <select id="len-unit">
+            <option value="1" selected>mm</option>
+            <option value="10">cm</option>
+            <option value="25.4">in</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="wid">Unsupported width <i>W</i></label>
+        <div class="input-row">
+          <input type="number" id="wid" value="20" step="1" min="0" />
+          <select id="wid-unit">
+            <option value="1" selected>mm</option>
+            <option value="10">cm</option>
+            <option value="25.4">in</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="pressure">Pressure difference <i>P</i></label>
+      <div class="input-row">
+        <input type="number" id="pressure" value="1" step="0.1" min="0" />
+        <select id="pressure-unit">
+          <option value="1e5" selected>bar</option>
+          <option value="100">mbar</option>
+          <option value="1000">kPa</option>
+          <option value="1e6">MPa</option>
+          <option value="6894.757293168361">psi</option>
+          <option value="101324">atm</option>
+          <option value="133.32105263157895">Torr</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button id="btn-reset" type="button">Reset</button>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="result" id="result">
+    <span class="result-label" id="result-label">Minimum thickness &mdash; clamped</span>
+    <span class="result-value" id="result-value">&mdash;</span>
+    <span class="result-alt" id="result-alt"></span>
+    <div class="result-secondary" id="result-secondary"></div>
+    <div class="working" id="working"></div>
+  </div>
+
+  <div class="reverse">
+    <h2>Check a thickness you already have</h2>
+    <div class="field">
+      <label for="have-t">Actual window thickness <span class="unit">(optional)</span></label>
+      <div class="input-row">
+        <input type="number" id="have-t" step="0.1" min="0" placeholder="e.g. 3" />
+        <select id="have-t-unit">
+          <option value="1" selected>mm</option>
+          <option value="10">cm</option>
+          <option value="25.4">in</option>
+        </select>
+      </div>
+    </div>
+    <div class="reverse-out" id="reverse-out" hidden></div>
+  </div>
+
+  <div class="notes">
+    <h2>How it works</h2>
+    <p>
+      The maximum stress on a uniformly loaded window is
+      <i>S</i><sub>max</sub> = <i>K</i>&middot;<i>D</i>&sup2;&middot;<i>P</i> / (4<i>T</i>&sup2;),
+      and to avoid plastic deformation this is held below the apparent elastic limit
+      <i>F</i><sub>a</sub> by a safety factor, <i>S</i><sub>max</sub> = <i>F</i><sub>a</sub> / <i>SF</i>.
+      Solving for <i>T</i> gives the expressions above. The support constant <i>K</i> depends on how the
+      window is held, on the force introduced in clamping, and on how brittle or ductile the material is.
+      Empirically <i>K</i> = 0.75 suits most optical crystals with a clamped perimeter, and a value 50%
+      greater, <i>K</i> = 1.125, when unclamped. Both are editable here if you have a better figure.
+    </p>
+    <p>
+      A safety factor of 4 is described as modest but sufficient for many laboratory applications where
+      operating conditions are reasonably under control; this page defaults to 5. Severe conditions such as
+      thermal shock need special consideration, and may even lead to a decision to use a reduced thickness.
+    </p>
+
+    <h2>Cautions</h2>
+    <ul>
+      <li>A carefully designed window may still break well below its rated load if the mounting introduces
+          any localised stress.</li>
+      <li>Mismatched expansion coefficients generally dictate a resilient material between window and mount.</li>
+      <li><strong>Soft gaskets allow flexure at the wall.</strong> The clamped constant assumes no flexure, so
+          if the window is seated on a soft gasket or O-ring, use the unclamped figure.</li>
+      <li>Thermal outgassing in UHV systems should be approached with caution for crystal windows, as thermal
+          shock may initiate cleavage.</li>
+      <li>Published apparent elastic limits are not always reliable. Crystals vary, and cleavage may occur
+          along grain boundaries or according to the particular cut of the ingot. The final design thickness
+          must be a carefully considered decision and may need to be tested empirically.</li>
+    </ul>
+
+    <h2>Source and a note on sapphire</h2>
+    <p>
+      Equations, support constants and elastic limits are from
+      <em>The Design of Pressure Windows</em>, Crystran Ltd, October 2014.
+      Elastic limits used here are the table's SI values. One caveat: that table lists sapphire as
+      &ldquo;276&nbsp;MPa = 45000&nbsp;psi&rdquo;, but 276&nbsp;MPa is 40030&nbsp;psi &mdash; the two figures
+      disagree, and every other material in the table is self-consistent. This calculator uses
+      <strong>276&nbsp;MPa</strong>, which matches Crystran's own sapphire datasheet and is the more
+      conservative choice. Crystran's printed worked example for a 25&nbsp;mm sapphire window at 3800&nbsp;psi
+      (7.7&nbsp;mm unclamped, 6.3&nbsp;mm clamped) was computed from 45000&nbsp;psi, so it will not reproduce
+      here &mdash; you should expect 8.17&nbsp;mm and 6.67&nbsp;mm instead. Enter 45000&nbsp;psi via
+      <em>Custom&hellip;</em> if you want to match the printed example. The other five worked examples in that
+      document reproduce exactly.
+    </p>
+    <p>
+      Atmospheric pressure is taken as 101324&nbsp;Pa, following the same document; note that 1&nbsp;bar is
+      100&nbsp;kPa exactly and so is slightly less than 1&nbsp;atm.
+    </p>
+    <p class="disclaimer">
+      Crystran Ltd accept no responsibility for the adoption of these calculations and recommendations, and
+      neither does the author of this page. Verify any safety-critical design independently.
+    </p>
+    <p>
+      Webpage maintained by <a href="mailto:sean.kung@ubc.ca">Sean Kung</a> at the University of British Columbia.
+    </p>
+  </div>
+
+  <script>
+    // ── Defaults ──────────────────────────────────────────────────────────────
+    const DEFAULTS = {
+      "material": "55.0",
+      "fa": 55,
+      "fa-unit": "1e6",
+      "mounting": "clamped",
+      "kconst": 0.75,
+      "sf": 5,
+      "shape": "round",
+      "dia": 50,
+      "dia-unit": "1",
+      "len": 52,
+      "len-unit": "1",
+      "wid": 20,
+      "wid-unit": "1",
+      "pressure": 1,
+      "pressure-unit": "1e5",
+      "have-t": "",
+      "have-t-unit": "1",
+    };
+
+    // Support constant K: empirical, 0.75 clamped and 50% greater unclamped.
+    const K_CLAMPED = 0.75;
+    const K_UNCLAMPED = 1.125;
+
+    const $ = id => document.getElementById(id);
+
+    // ── Core equations (general form, SF and K as free parameters) ────────────
+    // Circular:    T = D * sqrt(SF*K/4) * sqrt(P/Fa)
+    // Rectangular: T = L * sqrt(SF*K/2) * sqrt(P/(Fa*(1+R^2))),  R = L/W
+    // Lengths cancel, so D/L/W and T share whatever unit is passed in (mm here);
+    // P and Fa share theirs (Pa here).
+    function requiredThickness(shape, dims, P, Fa, SF, K) {
+      if (shape === "round") {
+        return dims.D * Math.sqrt(SF * K / 4) * Math.sqrt(P / Fa);
+      }
+      const R = dims.L / dims.W;
+      return dims.L * Math.sqrt(SF * K / 2) * Math.sqrt(P / (Fa * (1 + R * R)));
+    }
+
+    // Inverse of the above: the stress actually present at a given thickness.
+    //   Circular:    Smax = K*D^2*P / (4*T^2)
+    //   Rectangular: Smax = K*L^2*P / (2*T^2*(1+R^2))
+    function maxStress(shape, dims, P, T, K) {
+      if (shape === "round") {
+        return K * dims.D * dims.D * P / (4 * T * T);
+      }
+      const R = dims.L / dims.W;
+      return K * dims.L * dims.L * P / (2 * T * T * (1 + R * R));
+    }
+
+    // ── Formatting ────────────────────────────────────────────────────────────
+    function fmt(x, sig = 4) {
+      if (!isFinite(x)) return "—";
+      if (x === 0) return "0";
+      const a = Math.abs(x);
+      if (a >= 1e5 || a < 1e-3) return x.toExponential(2);
+      return String(Number(x.toPrecision(sig)));
+    }
+
+    const MM_PER_INCH = 25.4;
+    const PA_PER_MPA = 1e6;
+    const PA_PER_PSI = 6894.757293168361;
+
+    function mmAndInch(T_mm) {
+      return fmt(T_mm) + " mm <span class=\"result-alt\">(" + fmt(T_mm / MM_PER_INCH, 3) + " in)</span>";
+    }
+    function stressText(Pa) {
+      return fmt(Pa / PA_PER_MPA) + " MPa (" + fmt(Pa / PA_PER_PSI, 4) + " psi)";
+    }
+
+    // ── Read the form ─────────────────────────────────────────────────────────
+    function readInputs() {
+      const shape = $("shape").value;
+      const v = id => parseFloat($(id).value);
+      const u = id => parseFloat($(id).value);
+
+      const Fa = v("fa") * u("fa-unit");                 // Pa
+      const P  = v("pressure") * u("pressure-unit");     // Pa
+      const SF = v("sf");
+      const K  = v("kconst");
+
+      const dims = shape === "round"
+        ? { D: v("dia") * u("dia-unit") }                                    // mm
+        : { L: v("len") * u("len-unit"), W: v("wid") * u("wid-unit") };      // mm
+
+      return { shape, Fa, P, SF, K, dims };
+    }
+
+    function validate(inp) {
+      const { shape, Fa, P, SF, K, dims } = inp;
+      if ([Fa, P, SF, K].some(isNaN)) return "All fields must be valid numbers.";
+      if (Fa <= 0) return "Apparent elastic limit must be greater than zero.";
+      if (P  <= 0) return "Pressure difference must be greater than zero.";
+      if (SF <= 0) return "Safety factor must be greater than zero.";
+      if (K  <= 0) return "Support constant K must be greater than zero.";
+      if (shape === "round") {
+        if (isNaN(dims.D)) return "All fields must be valid numbers.";
+        if (dims.D <= 0) return "Diameter must be greater than zero.";
+      } else {
+        if (isNaN(dims.L) || isNaN(dims.W)) return "All fields must be valid numbers.";
+        if (dims.L <= 0 || dims.W <= 0) return "Length and width must be greater than zero.";
+      }
+      return null;
+    }
+
+    // ── Main ──────────────────────────────────────────────────────────────────
+    function update() {
+      const errorEl = $("error-msg");
+      const resultEl = $("result");
+      const inp = readInputs();
+
+      const err = validate(inp);
+      if (err) {
+        errorEl.textContent = err;
+        resultEl.hidden = true;
+        $("reverse-out").hidden = true;
+        return;
+      }
+      errorEl.textContent = "";
+      resultEl.hidden = false;
+
+      const { shape, Fa, P, SF, K, dims } = inp;
+      const mounting = $("mounting").value;
+      const isClamped = mounting === "clamped";
+
+      const T = requiredThickness(shape, dims, P, Fa, SF, K);
+
+      $("result-label").innerHTML = "Minimum thickness &mdash; " + (isClamped ? "clamped" : "unclamped");
+      $("result-value").innerHTML = fmt(T) + " mm";
+      $("result-alt").textContent = fmt(T / MM_PER_INCH, 3) + " in";
+
+      // The other mounting condition, at its standard K. Soft gaskets allow
+      // flexure, so the unclamped number is the one to use with an O-ring seat.
+      const otherK = isClamped ? K_UNCLAMPED : K_CLAMPED;
+      const otherName = isClamped ? "Unclamped" : "Clamped";
+      const Tother = requiredThickness(shape, dims, P, Fa, SF, otherK);
+      $("result-secondary").innerHTML =
+        otherName + " (<i>K</i> = " + otherK + "): <strong>" + fmt(Tother) + " mm</strong> ("
+        + fmt(Tother / MM_PER_INCH, 3) + " in)"
+        + (isClamped ? " &mdash; use this figure if the window seats on a soft gasket or O-ring." : "");
+
+      // Working, with the general equation and the numbers substituted in.
+      const allowable = Fa / SF;
+      let working;
+      if (shape === "round") {
+        working = "T = D &middot; &radic;(SF&middot;K/4) &middot; &radic;(P/Fa) = "
+          + fmt(dims.D) + " &middot; " + fmt(Math.sqrt(SF * K / 4)) + " &middot; "
+          + fmt(Math.sqrt(P / Fa)) + " = " + fmt(T) + " mm";
+      } else {
+        const R = dims.L / dims.W;
+        working = "R = L/W = " + fmt(R) + "<br>"
+          + "T = L &middot; &radic;(SF&middot;K/2) &middot; &radic;(P/(Fa&middot;(1+R&sup2;))) = "
+          + fmt(dims.L) + " &middot; " + fmt(Math.sqrt(SF * K / 2)) + " &middot; "
+          + fmt(Math.sqrt(P / (Fa * (1 + R * R)))) + " = " + fmt(T) + " mm";
+      }
+      working += "<br>Allowable stress Smax = Fa/SF = " + stressText(allowable)
+        + " &nbsp;(Fa = " + stressText(Fa) + ")";
+      $("working").innerHTML = working;
+
+      updateReverse(inp);
+    }
+
+    // ── Reverse check: what safety factor does a thickness I own actually give? ──
+    function updateReverse(inp) {
+      const out = $("reverse-out");
+      const raw = $("have-t").value.trim();
+      if (raw === "") { out.hidden = true; return; }
+
+      const T = parseFloat(raw) * parseFloat($("have-t-unit").value);   // mm
+      if (isNaN(T) || T <= 0) {
+        out.hidden = false;
+        out.innerHTML = "<span class=\"sf-bad\">Enter a thickness greater than zero.</span>";
+        return;
+      }
+
+      const { shape, Fa, P, SF, K, dims } = inp;
+      const Smax = maxStress(shape, dims, P, T, K);
+      const realized = Fa / Smax;
+
+      // Band the verdict rather than testing realized >= SF outright. Typing back the
+      // thickness this page displays (which is rounded) lands a hair under target, and
+      // "4.998 — below your target of 5" would be alarming out of all proportion.
+      const ratio = realized / SF;
+      let cls, verdict;
+      if (ratio >= 1) {
+        cls = "sf-ok";
+        verdict = "meets your target of " + fmt(SF, 4) + ".";
+      } else if (ratio >= 0.99) {
+        cls = "sf-marginal";
+        verdict = "marginally below your target of " + fmt(SF, 4) + ".";
+      } else {
+        cls = "sf-bad";
+        verdict = "below your target of " + fmt(SF, 4) + ".";
+      }
+
+      out.hidden = false;
+      out.innerHTML =
+        "At <strong>" + fmt(T) + " mm</strong> ("
+        + ($("mounting").value === "clamped" ? "clamped" : "unclamped")
+        + ", <i>K</i> = " + fmt(K) + "):<br>"
+        + "Stress in the window S<sub>max</sub> = " + stressText(Smax) + "<br>"
+        + "Realised safety factor = <span class=\"" + cls + "\">" + fmt(realized, 4) + "</span> "
+        + "&mdash; <span class=\"" + cls + "\">" + verdict + "</span>";
+    }
+
+    // ── Control wiring ────────────────────────────────────────────────────────
+    // Fa is driven by the material preset and locked, except under "Custom…".
+    function applyMaterial() {
+      const sel = $("material").value;
+      const fa = $("fa");
+      if (sel === "custom") {
+        fa.readOnly = false;
+        return;
+      }
+      fa.readOnly = true;
+      const Fa_Pa = parseFloat(sel) * PA_PER_MPA;
+      fa.value = Number((Fa_Pa / parseFloat($("fa-unit").value)).toPrecision(6));
+    }
+
+    // Changing the Fa unit converts the displayed number rather than reinterpreting it.
+    let faUnitPrev = parseFloat($("fa-unit").value);
+    function convertFaUnit() {
+      const next = parseFloat($("fa-unit").value);
+      const cur = parseFloat($("fa").value);
+      if (!isNaN(cur)) {
+        $("fa").value = Number((cur * faUnitPrev / next).toPrecision(6));
+      }
+      faUnitPrev = next;
+    }
+
+    function applyMounting() {
+      $("kconst").value = $("mounting").value === "clamped" ? K_CLAMPED : K_UNCLAMPED;
+    }
+
+    function applyShape() {
+      const round = $("shape").value === "round";
+      $("round-fields").hidden = !round;
+      $("rect-fields").hidden = round;
+      $("formula-round").classList.toggle("inactive", !round);
+      $("formula-rect").classList.toggle("inactive", round);
+    }
+
+    function resetFields() {
+      for (const [id, val] of Object.entries(DEFAULTS)) {
+        $(id).value = val;
+      }
+      faUnitPrev = parseFloat($("fa-unit").value);
+      applyMaterial();
+      applyShape();
+      update();
+    }
+
+    $("material").addEventListener("change", () => { applyMaterial(); update(); });
+    $("fa-unit").addEventListener("change", () => { convertFaUnit(); update(); });
+    $("mounting").addEventListener("change", () => { applyMounting(); update(); });
+    $("shape").addEventListener("change", () => { applyShape(); update(); });
+    $("btn-reset").addEventListener("click", resetFields);
+
+    // Everything else just recalculates.
+    document.querySelectorAll("input[type='number'], select").forEach(el => {
+      el.addEventListener("input", update);
+      el.addEventListener("change", update);
+    });
+
+    // ── First load ────────────────────────────────────────────────────────────
+    applyMaterial();
+    applyShape();
+    update();
+  </script>
+
+</body>
+</html>
