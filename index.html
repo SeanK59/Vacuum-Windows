@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Online calculator for the thickness of optical windows used in vacuum and pressure applications, following the Crystran design equations." />
   <title>Vacuum Window Thickness Calculator</title>
+  <script>try{var t=localStorage.getItem('seankung-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
   <style>
     /* ── Shared site theme (matches seankung.ca) ── */
     :root {
@@ -260,9 +261,15 @@
     .notes a { color: var(--accent); text-decoration: none; }
     .notes a:hover { text-decoration: underline; }
     .notes .disclaimer { font-size: 0.85rem; color: var(--text-3); }
+  :root{color-scheme:dark}
+  :root[data-theme="light"]{color-scheme:light;--bg:#f4f6f7;--panel:#ffffff;--border:#d0d5da;--divider:#c3c9cf;--text:#1b1f23;--text-2:#3f4a54;--text-3:#66727d;--accent:#00796b;--accent-hover-bg:#e0f2f1;--warn:#cf222e;--marginal:#9a6700}
+  .theme-toggle{position:absolute;top:10px;right:14px;width:32px;height:32px;padding:0;border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;font-size:16px;line-height:1;z-index:50}
+  .theme-toggle:hover{border-color:var(--accent)}
+.home-link{padding-right:46px}   /* keep the nav line clear of the theme button */
   </style>
 </head>
 <body>
+<button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch theme"></button>
 
   <nav class="home-link"><a href="https://seankung.ca/">&larr; seankung.ca</a></nav>
 
@@ -745,5 +752,30 @@
     update();
   </script>
 
+<script>
+/* dark / light switch: saved under one key, shared by every page on seankung.ca */
+(function () {
+  var root = document.documentElement, btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  function cur() { return root.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
+  function paint() {
+    var light = cur() === 'light';
+    btn.textContent = light ? '\u263E' : '\u2600';
+    btn.title = light ? 'Switch to dark theme' : 'Switch to light theme';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  function set(t, save) {
+    root.setAttribute('data-theme', t);
+    if (save) try { localStorage.setItem('seankung-theme', t); } catch (e) { /* private mode: the choice just is not remembered */ }
+    paint();
+    window.dispatchEvent(new Event('themechange'));
+  }
+  btn.addEventListener('click', function () { set(cur() === 'light' ? 'dark' : 'light', true); });
+  window.addEventListener('storage', function (e) {          // another tab changed it
+    if (e.key === 'seankung-theme' && (e.newValue === 'light' || e.newValue === 'dark') && e.newValue !== cur()) set(e.newValue, false);
+  });
+  paint();
+})();
+</script>
 </body>
 </html>
